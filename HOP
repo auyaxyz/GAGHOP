@@ -1,0 +1,64 @@
+-- Script dibuat untuk executor LuaU seperti Fluxus, Delta, Cryptic
+-- Pastikan eksekusi dilakukan dalam game, bukan di studio
+
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local PlaceId = game.PlaceId
+local CurrentJobId = game.JobId
+
+-- Konfigurasi
+local JEDA_REQUEST = 3 -- detik
+local MAKS_PLAYER = 4 -- maksimal pemain agar dianggap sebagai server target
+
+-- Fungsi ambil daftar server publik
+local function GetServers(cursor)
+    local url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?limit=100"
+    if cursor then
+        url = url .. "&cursor=" .. cursor
+    end
+
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(url))
+    end)
+
+    if success then
+        return result
+    else
+        return nil
+    end
+end
+
+-- Fungsi loop cari server yang cocok
+local function HopToServer()
+    while true do
+        local cursor = nil
+        repeat
+            local data = GetServers(cursor)
+            if not data then
+                warn("Gagal mengambil data server. Mencoba lagi dalam " .. JEDA_REQUEST .. " detik.")
+                task.wait(JEDA_REQUEST)
+                break
+            end
+
+            for _, server in pairs(data.data) do
+                if server.playing < MAKS_PLAYER and server.id ~= CurrentJobId then
+                    print("Menemukan server cocok, teleporting ke ID:", server.id)
+                    TeleportService:TeleportToPlaceInstance(PlaceId, server.id, player)
+                    return -- keluar dari loop setelah teleport
+                end
+            end
+
+            cursor = data.nextPageCursor
+            task.wait(1) -- jeda singkat antar halaman
+        until not cursor
+
+        print("Belum menemukan server yang cocok. Mencoba ulang dalam " .. JEDA_REQUEST .. " detik.")
+        task.wait(JEDA_REQUEST)
+    end
+end
+
+-- Eksekusi fungsi
+HopToServer()
