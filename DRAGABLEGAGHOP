@@ -1,0 +1,109 @@
+-- SETTINGS
+local MAKS_PLAYER = 4
+local JEDA_REQUEST = 3
+
+-- SERVICES
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local Player = Players.LocalPlayer
+
+local PlaceId = game.PlaceId
+local CurrentJobId = game.JobId
+
+-- TOGGLE VARIABEL
+getgenv().HOP_ACTIVE = false
+
+-- GUI SETUP
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "HopToggleGUI"
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 120, 0, 50)
+Frame.Position = UDim2.new(0, 10, 0, 10)
+Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = false -- karena kita buat custom drag
+Frame.Parent = ScreenGui
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(1, 0, 1, 0)
+ToggleButton.Position = UDim2.new(0, 0, 0, 0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+ToggleButton.Text = "HOP: OFF"
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.TextSize = 20
+ToggleButton.Parent = Frame
+
+-- TOGGLE FUNGSI
+ToggleButton.MouseButton1Click:Connect(function()
+	getgenv().HOP_ACTIVE = not getgenv().HOP_ACTIVE
+	if getgenv().HOP_ACTIVE then
+		ToggleButton.Text = "HOP: ON"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(70, 200, 70)
+	else
+		ToggleButton.Text = "HOP: OFF"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+	end
+end)
+
+-- DRAGGABLE MEKANISME
+local dragging, dragInput, dragStart, startPos
+
+Frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = Frame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- SERVER HOP LOOP
+spawn(function()
+	while true do
+		if getgenv().HOP_ACTIVE then
+			local cursor = nil
+			repeat
+				local data = nil
+				pcall(function()
+					data = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?limit=100" .. (cursor and "&cursor=" .. cursor or "")))
+				end)
+
+				if data and data.data then
+					for _, server in pairs(data.data) do
+						if server.playing < MAKS_PLAYER and server.id ~= CurrentJobId then
+							TeleportService:TeleportToPlaceInstance(PlaceId, server.id, Player)
+							return
+						end
+					end
+					cursor = data.nextPageCursor
+					task.wait(1)
+				else
+					warn("Gagal ambil data server.")
+					break
+				end
+			until not cursor
+
+			print("Belum ada server cocok. Tunggu " .. JEDA_REQUEST .. " detik.")
+			task.wait(JEDA_REQUEST)
+		else
+			task.wait(1)
+		end
+	end
+end)
