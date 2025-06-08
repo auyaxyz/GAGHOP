@@ -1,0 +1,96 @@
+-- ✅ KONFIGURASI
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PLACE_ID = game.PlaceId
+local CURRENT_JOB = game.JobId
+
+getgenv().HOP_ACTIVE = false
+getgenv().VISITED_JOBS = getgenv().VISITED_JOBS or {}
+
+-- ✅ Tambahkan server saat ini ke list visited
+getgenv().VISITED_JOBS[CURRENT_JOB] = true
+
+-- ✅ GUI TOGGLE SETUP
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.ResetOnSpawn = false
+gui.Name = "SmartHopGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 150, 0, 50)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active = true
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.new(1, 0, 1, 0)
+button.Text = "HOP: OFF"
+button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+button.Font = Enum.Font.SourceSansBold
+button.TextColor3 = Color3.new(1, 1, 1)
+button.TextSize = 20
+
+-- ✅ Toggle logic
+button.MouseButton1Click:Connect(function()
+    getgenv().HOP_ACTIVE = not getgenv().HOP_ACTIVE
+    if getgenv().HOP_ACTIVE then
+        button.Text = "HOP: ON"
+        button.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        button.Text = "HOP: OFF"
+        button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+-- ✅ Drag support
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                   startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ✅ Server Hop Loop dengan pemblokiran server yang sama
+task.spawn(function()
+    while true do
+        if getgenv().HOP_ACTIVE then
+            local jobId = game.JobId
+            getgenv().VISITED_JOBS[jobId] = true
+
+            -- Teleport loop
+            TeleportService:Teleport(PLACE_ID, LocalPlayer)
+
+            -- Tunggu dan deteksi jika server tidak berpindah
+            local timeout = 15
+            local elapsed = 0
+            while game.JobId == jobId and elapsed < timeout do
+                task.wait(1)
+                elapsed += 1
+            end
+
+            -- Jika tetap di server yang sama, berarti Roblox teleport ke server yang sama
+            if game.JobId == jobId then
+                warn("⚠️ Masih di server yang sama, tunggu 5 detik lalu coba lagi...")
+                task.wait(5)
+            else
+                -- Tambahkan server baru ke daftar blokir
+                getgenv().VISITED_JOBS[game.JobId] = true
+            end
+        else
+            task.wait(1)
+        end
+    end
+end)
