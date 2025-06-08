@@ -1,0 +1,74 @@
+-- ✅ KONFIGURASI
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PLACE_ID = game.PlaceId
+local CURRENT_JOB = game.JobId
+
+getgenv().HOP_ACTIVE = false
+
+-- ✅ GUI TOGGLE SETUP
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.ResetOnSpawn = false
+gui.Name = "SimpleHopGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 150, 0, 50)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active = true
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.new(1, 0, 1, 0)
+button.Text = "HOP: OFF"
+button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+button.Font = Enum.Font.SourceSansBold
+button.TextColor3 = Color3.new(1, 1, 1)
+button.TextSize = 20
+
+-- ✅ Toggle logic
+button.MouseButton1Click:Connect(function()
+    getgenv().HOP_ACTIVE = not getgenv().HOP_ACTIVE
+    if getgenv().HOP_ACTIVE then
+        button.Text = "HOP: ON"
+        button.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        button.Text = "HOP: OFF"
+        button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+-- ✅ Drag support
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                   startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ✅ Server Hop Loop (pindah ke server lain pakai Reserved Server trick)
+task.spawn(function()
+    while true do
+        if getgenv().HOP_ACTIVE then
+            -- Buat teleport ke server acak dengan ID dummy untuk mengganti server
+            TeleportService:Teleport(PLACE_ID, LocalPlayer)
+            -- Tunggu 8-10 detik (waktu teleport)
+            task.wait(10)
+        else
+            task.wait(1)
+        end
+    end
+end)
